@@ -65,6 +65,7 @@ bool thread_mlfqs;
 
 			/* Modified part of code */
 		fixed_t load_avg;
+/*end*/
 
 static void kernel_thread (thread_func *, void *aux);
 
@@ -84,19 +85,20 @@ static tid_t allocate_tid (void);
 
 
  	void
-	checkInvoke(struct thread *t, void *aux UNUSED)
- {
-    	 /* this will  Check if the thread is currently blocked and has remaining ticks to wait */
-     		 if (t->status == THREAD_BLOCKED && t->ticks_blocked > 0) 
-   		 {
-        	/* Decrement the remaining blocked ticks */
-        		--t->ticks_blocked;
-
-        		  /* If the thread has finished waiting, unblock it */
-           if (t->ticks_blocked == 0) 
+checkInvoke(struct thread *t, void *aux UNUSED)
+{
+    	//this is only proceed for threads that are in the blocked state with non-zero wait time
+     if (THREAD_BLOCKED == t->status && t->ticks_blocked)
+    {
+        t->ticks_blocked -= 1;
+        	//Ready the thread once its block duration ends
+        	if (!t->ticks_blocked)
+        	{
             	thread_unblock(t);
-    	}
-			}
+        	}
+    }
+}
+/*end*/
 
 
 /* Initializes the threading system by transforming the code
@@ -215,7 +217,8 @@ thread_create (const char *name, int priority,
   tid = t->tid = allocate_tid ();
 
   	  /* Modified part of code  */
-  			t->ticks_blocked = 0;
+  			t->ticks_blocked = 0;//Making ticked_blocked to zero
+	/*end*/
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -235,10 +238,10 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
-  /* Solution Code */
-  /* Preempt the current thread */
-  if (thread_current()->priority < priority)
-    thread_yield();
+  /*Modified part of code*/
+  /* this will be Preempting  the current thread */
+  	if (thread_current()->priority < priority)//checking if the priority of the current is less than our threshold priority
+          thread_yield();
 
   return tid;
 }
@@ -260,14 +263,22 @@ thread_block (void)
 }
 
 		/*		 Modified part of code */
-	/* Function for thread priority comparison. */
-/* Compare the priority of two threads (used in ready list). */
-		bool
-		thread_cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
- {
-    	return list_entry(a, struct thread, elem)->priority >
-           list_entry(b, struct thread, elem)->priority;
- }
+	/*this is used as the Function for thread priority comparison. */
+/*and now we will be Comparing  the priority of two threads (used in ready list). */
+		//Comparing  the priorities of two threads in a list.
+//and then Returns true if the first thread has a higher priority than the second,
+//this is which helps in sorting threads in descending order of priority.
+
+	bool
+	thread_cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+	{
+    //first we will Extract the thread structures from the list elements
+    	const struct thread *first = list_entry(a, struct thread, elem);
+    		const struct thread *second = list_entry(b, struct thread, elem);
+    //we will then compare their priorities: return true if 'first' has a higher priority
+    	return first->priority > second->priority;
+}
+
 
  	/* will Compare two locks based on their max priority (used in lock list). */
  bool
@@ -317,17 +328,16 @@ thread_block (void)
         }
 intr_set_level(old_level);}
 
-/* Make the current thread hold the given lock. */
+/*will Make the current thread hold the given lock. */
 void
 thread_hold_lock(struct lock *lock)
 {
     enum intr_level old_level = intr_disable();
     struct thread *cur = thread_current();
 
-    /* Insert the lock into the current thread's holding list. */
+    /*we will Insert the lock into the current thread's holding list. */
     list_insert_ordered(&cur->locks_holding, &lock->elem, lock_cmp_priority, NULL);
-
-    /* If the lock's priority is higher, update the thread's priority. */
+    /*If the lock's priority is higher, update the thread's priority. */
     if (cur->priority < lock->max_priority)
     {
         cur->priority = lock->max_priority;
@@ -341,13 +351,14 @@ thread_hold_lock(struct lock *lock)
 void
 thread_remove_lock(struct lock *lock)
 {
-    enum intr_level old_level = intr_disable();
+    		enum intr_level old_level = intr_disable();
 
-    list_remove(&lock->elem);
-    thread_update_priority(thread_current());
-
+   	 list_remove(&lock->elem);
+   		 thread_update_priority(thread_current());
     intr_set_level(old_level);
 }
+
+/*end*/
 
 /* Transitions a blocked thread T to the ready-to-run state.
    This is an error if T is not blocked.  (Use thread_yield() to
@@ -472,30 +483,31 @@ thread_foreach (thread_action_func *func, void *aux)
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
+// Sets the current thread's priority to a new value,
+// handling cases like priority donation and MLFQS exclusions.
 void
-thread_set_priority (int new_priority) 
+thread_set_priority(int new_priority)
 {
-
-       /*   Modified part of code */
- 	 if (thread_mlfqs)
-    return;
-
-	enum intr_level old_level = intr_disable();
-		 struct thread *cur = thread_current();
-    int old_priority = cur->priority;
-
-	  cur->base_priority = new_priority;
-
-	 /*  If the thread holds no locks or the new priority is higher, update it. */
-	   if (list_empty(&cur->locks_holding) || new_priority > old_priority)
-	 {
-    	cur->priority = new_priority;
-    	thread_yield();
-	}
-
-		 intr_set_level(old_level);
-
+	/*Modified part of code*/
+    //will be Skip manual priority handling if MLFQS is active
+    if (thread_mlfqs)
+        return;
+    	//we will be Disable interrupts to avoid race conditions during priority update
+    	enum intr_level old_level = intr_disable();
+    struct thread *cur = thread_current();//we will Get the currently running thread
+    int old_priority = cur->priority; //this is the Backup current effective priority
+    cur->base_priority = new_priority; // Update the base (original) priority
+    //If the thread doesn't hold any locks, or the new priority is higher than current,
+    //update the effective priority and consider yielding the CPU
+    	if (list_empty(&cur->locks_holding) || new_priority > old_priority)
+    {cur->priority = new_priority;   // Apply the new effective priority
+        thread_yield(); // Yield to allow higher-priority threads to run
+    }
+        // Restore previous interrupt state
+    intr_set_level(old_level);
 }
+/*end*/
+
 
 /* Returns the current thread's priority. */
 int
@@ -519,15 +531,19 @@ int
 thread_get_nice (void) 
 {
      /*  Modified part of code */
+	//Will return the current thread
          return thread_current()->nice;
+	//end
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) 
 {
-     /*  Modified part of code   */
-  	  return FP_ROUND (FP_MULT_MIX (load_avg, 100));
+     /*Modified part of code   */
+	//will return the fp_round
+  		return FP_ROUND (FP_MULT_MIX (load_avg, 100));
+	//end
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
@@ -556,12 +572,14 @@ mlfqs_update_priority(struct thread *t)
                         2 * t->nice
                     )
                  );
+	//end
 
     /* Clamp priority within allowed range. */
     if (t->priority < PRI_MIN)
         t->priority = PRI_MIN;
     else if (t->priority > PRI_MAX)
         t->priority = PRI_MAX;
+	
 }
 
 /* Increment the recent_cpu of the running thread (except idle thread) by 1. */
@@ -711,21 +729,32 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
 
   	/*   Modified part of code  */
- 	  t->base_priority = priority;
-	
-   list_init(&t->locks_holding);
-	
-  		 t->lock_waiting4 = NULL;
-     
-	t->nice = 0;
-             t->recent_cpu = FP_CONST (0);
+ 	 //Set the base priority of the thread to the default or given priority
+		t->base_priority = priority;
+	//firts Initialize the list that will store all locks currently held by this thread
+ list_init(&t->locks_holding);
+ //and the we will At creation, the thread isn't waiting for any lock
+	 t->lock_waiting4 = NULL;
+	//this will Set default MLFQS parameters (used if MLFQS is enabled)
+		//also the 'nice' determines how "nice" the thread is — lower values mean higher priority
+   t->nice = 0;
+	//and the  recent_cpu tracks the recent CPU usage of this thread, initialized to 0 (fixed-point representation)
+ t->recent_cpu = FP_CONST(0);
+	//this will Disable interrupts before performing further critical initialization
+	old_level = intr_disable();
 
-  old_level = intr_disable ();
   	/*Modified part of code   */
-   		list_insert_ordered(&all_list, 
-			&t->allelem, 
-			(list_less_func *)&thread_cmp_priority, 
-			NULL);
+   		//this will Insert the thread's list element into the global list of all threads (`all_list`),
+/wei will  maintaining descending order based on thread priority.
+//also The cast ensures compatibility with the expected function signature.
+
+		list_insert_ordered(
+   			 &all_list,                           //this will List where the new element will be inserted
+   		 &t->allelem,                         //also the The thread's element to insert
+   	 (list_less_func *) &thread_cmp_priority, //this will Comparison function to maintain priority order
+   			 NULL                                 //Auxiliary data (unused here)
+		);
+//end
 
   intr_set_level (old_level);
 }
