@@ -94,11 +94,12 @@ struct thread
 
              /* Modified part of code    */
        int64_t ticks_blocked;                        /* will the   Ticks that the thread need to be blocked. */
-          int base_priority; /*    will be  Used to record thread's priority when it's not being donated. */
+          int base_priority; /*will be  Used to record thread's priority when it's not being donated. */
              struct list locks_holding;/*  will be the    List of locks the thread is holding. */
-                  struct lock *lock_waiting4;      /* will be The lock the thread is waiting for. */
-                   int nice; /*will be the   Nice value. */
+                  struct lock *lock_waiting4; /* will be The lock the thread is waiting for. */
+                   int nice; 
                 fixed_t recent_cpu;/* this is the  Recent CPU. */
+//end
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -118,15 +119,15 @@ struct thread
 extern bool thread_mlfqs;
                  /* Modified part of code e */
      void checkInvoke(struct thread *t, void *aux UNUSED);
-
 void thread_init (void);
 void thread_start (void);
-
 void thread_tick (void);
 void thread_print_stats (void);
-
 typedef void thread_func (void *aux);
-tid_t thread_create (const char *name, int priority, thread_func *, void *);
+tid_t thread_create (const char *name, 
+int priority, 
+thread_func *, 
+void *);
 
 void thread_block (void);
 void thread_unblock (struct thread *);
@@ -137,7 +138,7 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
-
+//end
 /* Performs some operation on thread t, given auxiliary data AUX. */
 typedef void thread_action_func (struct thread *t, void *aux);
 void thread_foreach (thread_action_func *, void *);
