@@ -22,11 +22,14 @@ struct lock
     struct thread *holder;      /* Thread holding lock (for debugging). */
     struct semaphore semaphore; /* Binary semaphore controlling access. */
 	
+/*Modified part of code */
+struct list_elem elem;        //List of the element used for the priority donation. 
+                                 //this will  Allows the thread to be inserted into lists like waiters or locks_held.
 
-			/*Modified part of code  */
-	    struct list_elem elem;   /* This iis the   list element which is store for the stored for priority donation. */
-                           int max_priority;                  /*  this is the   The maximum priority among the priorities of threads acquiring the lock. */
-  };
+int max_priority;               //The is the maximum priority among all the threads waiting on or holding the lock.
+                                 //this is Used for   implementing priority donation effectively.
+
+			/*end*/ };
 
 void lock_init (struct lock *);
 void lock_acquire (struct lock *);
@@ -47,9 +50,14 @@ void cond_broadcast (struct condition *, struct lock *);
 
 
 	/* 		Modified part of codee */
-bool cond_cmp_priority(const struct list_elem *, 
-const struct list_elem *, 
-void * UNUSED);
+	//Comparing the  function used to sort condition variable waiters by thread priority.
+ //and also Each element in the list is a struct semaphore_elem, which internally holds a semaphore.
+    //this ,The thread with the highest priority waiting on the semaphore is used for comparison.
+bool cond_cmp_priority(const struct list_elem *a, 
+                       	const struct list_elem *b, 
+                       		void *aux UNUSED);
+/*end*/
+
 
 /* Optimization barrier.
 
