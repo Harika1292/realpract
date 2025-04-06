@@ -36,9 +36,9 @@ static void real_time_delay (int64_t num, int32_t denom);
 			void
 			timer_init (void) 
 	{
- 		 pit_configure_channel (0, 2, TIMER_FREQ);
- 		 intr_register_ext (0x20, timer_interrupt, "8254 Timer");
-	}
+ 		 pit_configure_channel (0, 2, TIMER_FREQ);//first we will call the configure channel
+ 		 intr_register_ext (0x20, timer_interrupt, "8254 Timer");//and then will call the regiater ext
+	}//end
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
 void
@@ -92,23 +92,25 @@ timer_elapsed (int64_t then)
 	void
 				timer_sleep(int64_t ticks) 
 {
-    /* Ignore negative or zero ticks — no need to block. */
+    /* we will Ignore negative or zero ticks — no need to block. */
     if (ticks <= 0)
         return;
 
-    ASSERT(intr_get_level() == INTR_ON);
 
+	
+    ASSERT(intr_get_level() == INTR_ON);
     /* Disable interrupts before modifying thread state. */
     enum intr_level old_level = intr_disable();
 
+
+	
     /* Set the number of ticks the current thread should sleep. */
     thread_current()->ticks_blocked = ticks;
-
     /* Block the current thread until it's unblocked by the timer tick handler. */
     thread_block();
-
     /* Restore the previous interrupt level. */
     intr_set_level(old_level);
+	//end
 }
 
 
